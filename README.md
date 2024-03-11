@@ -11,10 +11,9 @@ O exemplo a seguir usa uma aplicação [Flask](https://flask.palletsprojects.com
 ## V1: Utilize o opentelemtry para auto instrumentação:
 
 
-Para começar, configure um ambiente virtual:
+Para começar, configure um ambiente virtual, a partir da raiz do repositório clonado:
 
 ```sh
-cd otel-getting-started/v1
 python3 -m venv venv
 source ./venv/bin/activate
 ```
