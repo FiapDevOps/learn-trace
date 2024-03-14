@@ -14,6 +14,8 @@ O exemplo a seguir usa uma aplicação [Flask](https://flask.palletsprojects.com
 Para começar, configure um ambiente virtual, a partir da raiz do repositório clonado:
 
 ```sh
+git clone https://github.com/FiapDevOps/learn-trace
+cd learn-trace/
 python3 -m venv venv
 source ./venv/bin/activate
 ```
@@ -37,9 +39,7 @@ logger = logging.getLogger(__name__)
 
 @app.route("/rolldice")
 def roll_dice():
-    player = request.args.get('player', default = None, type = str)
-    result = str(roll())
-    return result
+    return str(roll())
 
 def roll():
     return randint(1, 6)
@@ -53,15 +53,17 @@ flask run -p 8080
 
 > Deverá ser possível acessar a app a partir do servidor onde foi exposta na página 8080 utilizando a path /rolldice
 
+> Usuários da IDE Cloud9: É possível visualizar a aplicação utilizando o menu "Preview" e clicando em "Preview Running Application" na parte superior da tela, em seguida remova a barra ao final da URL e no lugar adicione na URL a porta 8080 e a path /rolldice: ":8080/rolldice"
+
 A instrumentação automática gerará dados de telemetria, usaremos o agente do instrumento opentelemetry:
 
-Instale o pacote opentelemetry-distro, que contém a API OpenTelemetry, SDK e também as ferramentas opentelemetry-bootstrap e opentelemetry-instrument que você usará abaixo:
+Pare a aplicação e instale o pacote [opentelemetry-distro](https://pypi.org/project/opentelemetry-distro/), que contém a API OpenTelemetry, SDK e também as ferramentas opentelemetry-bootstrap e opentelemetry-instrument que você usará abaixo:
 
 ```sh
 pip install opentelemetry-distro
 ```
 
-Execute o opentelemetry-bootstrap para detectar as bibliotecas instaladas e instalar automaticamente os pacotes de instrumentação:
+Execute o comando [opentelemetry-bootstrap](https://pypi.org/project/opentelemetry-instrumentation/) para detectar as bibliotecas instaladas e instalar automaticamente os pacotes de instrumentação:
 
 ```sh
 opentelemetry-bootstrap -a install
@@ -136,21 +138,31 @@ opentelemetry-instrument \
 
 ## V3: inclua o Jeager para importar e visualizar o tracing da aplicação:
 
+Para a chamada anterior, e inicie em background um agente do [Jeager](https://www.jaegertracing.io) que servirá como coletor para os dados de trace:
+
 ```sh
-docker run -d --rm -e COLLECTOR_ZIPKIN_HOST_PORT=:9411 \
-    -p 80:16686 \ 
-    -p 4317:4317 \
-    -p 4318:4318 \
-    -p 9411:9411 \
-    jaegertracing/all-in-one:latest
+docker run -d --rm --name jaeger \
+  -e COLLECTOR_ZIPKIN_HTTP_PORT=9411 \
+  -p 5775:5775/udp \
+  -p 6831:6831/udp \
+  -p 6832:6832/udp \
+  -p 5778:5778 \
+  -p 80:16686 \
+  -p 14268:14268 \
+  -p 9411:9411 \
+  -p 4317:4317 \
+  -p 4318:4318 \
+  jaegertracing/all-in-one:latest
 ```
+
+Neste caso estamos utilizando uma versão all-in-one de execução conforme a [documentação do projeto](https://www.jaegertracing.io/docs/1.6/getting-started/), a unica alteração executada foi o bind do frontend na porta 80 ao invés da porta 16686 e na exposicão das portas 4317 e 4318 usads para a coleta do dados enviados pelo exporter otlp.
 
 > Neste cenário executamos um Jeager utilizando um container all-in-one para testar o funcionamento do coletor otpl que será invocado a seguir.
 
 O Jeafer atuará como coletor das métricas e dados de rtracing enviados pelo apm, quanto a aplicação, uma última versão será usada neste teste
 
 ```sh
-cp v3/app.py
+cp v3/app.py app.py
 
 cat app.py
 ```
@@ -206,7 +218,7 @@ Modifique o comando para exportar intervalos e métricas via OTLP execute a appl
 
 ```sh
 export OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED=true
-opentelemetry-instrument --logs_exporter --service_name dice-server otlp flask run -p 8080
+opentelemetry-instrument --logs_exporter otlp --service_name dice-server otlp flask run -p 8080
 ```
 
 Execute algumas chamadas na aplicação na porta 8080 usando a path /rolldice, em seguida valide o conteúdo da coleta de trace na interface do Jeager na porta 80 do servidor ou host usado no laboratório.
